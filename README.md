@@ -1,8 +1,10 @@
 # yoin
 Complete Bitcoin Wallet And Client Implement by Golang
+完整的比特币实现，代码里面有很多中文注释。详情可以看[博客]()
 
 ## 代码结构
 - core 区块链核心代码
-  - addr.go 地址生成与一些地址操作
-  - block.go 区块操作
-  - uin256.go hash32byte一些处理函数
+  - addr.go 地址相关
+  - block.go 区块相关
+  - uin256.go hash32byte一些辅助函数
+  - tx.go 交易相关
