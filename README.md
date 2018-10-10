@@ -7,5 +7,6 @@ Complete Bitcoin Wallet And Client Implement by Golang
 - core 区块链核心代码
   - addr.go 地址相关
   - block.go 区块相关
-  - uin256.go hash32byte一些辅助函数
   - tx.go 交易相关
+  - uin256.go hash32byte一些辅助函数
+  - util.go 一些功能函数

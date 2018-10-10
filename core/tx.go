@@ -1,6 +1,9 @@
 package core
 
-import "bytes"
+import (
+	"bytes"
+	"encoding/binary"
+)
 
 // 签名hash类型
 const (
@@ -39,7 +42,111 @@ type Tx struct {
 }
 
 
-func (t *Tx) Serializer() ([]byte){
-	wr := new(bytes.Buffer)
-	return wr.Bytes()
+// 编码交易
+func (t *Tx) Serialize() ([]byte){
+	var tmpBuf [9]byte
+	buf := new(bytes.Buffer)
+
+	// 版本
+	binary.Write(buf, binary.LittleEndian, t.Version)
+
+	// 交易输入数量
+	buf.Write(tmpBuf[: StoreVarLen(tmpBuf[:], len(t.TxIns))])
+	// 交易输入
+	for i := range t.TxIns {
+		buf.Write(t.TxIns[i].Input.PreOutTxHash[:])
+		binary.Write(buf, binary.LittleEndian, t.TxIns[i].Input.OutIdxInTx)
+		buf.Write(tmpBuf[: StoreVarLen(tmpBuf[:], len(t.TxIns[i].ScriptSig))])
+		buf.Write(t.TxIns[i].ScriptSig[:])
+		binary.Write(buf, binary.LittleEndian, t.TxIns[i].Sequence)
+	}
+
+	// 交易输出数量
+	buf.Write(tmpBuf[: StoreVarLen(tmpBuf[:], len(t.TxOuts))])
+	for i := range t.TxOuts {
+		binary.Write(buf, binary.LittleEndian, t.TxOuts[i].Value)
+		buf.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxOuts[i].ScriptPubKey))])
+		buf.Write(t.TxOuts[i].ScriptPubKey[:])
+	}
+
+	// LockTime
+	binary.Write(buf, binary.LittleEndian, t.LockTime)
+
+	return buf.Bytes()
+}
+
+// 解码交易输出
+func DeserializeTxOut(b []byte) (txOut *TxOut, offs int) {
+	var l ,n int
+
+	txOut = new(TxOut)
+	txOut.Value = binary.LittleEndian.Uint64(b[:8])
+	offs = 8
+
+	l, n = LoadVarLen(b[offs:])
+	offs += n
+
+	txOut.ScriptPubKey = make([]byte, l)
+	copy(txOut.ScriptPubKey[:], b[offs: offs + l])
+	offs += l
+
+	return
+}
+
+// 解码交易输入
+func DeserializeTxIn(b []byte) (txIn *TxIn, offs int) {
+    var l, n int
+
+    txIn = new(TxIn)
+
+    // 该输入对应输出交易HASH
+    copy(txIn.Input.PreOutTxHash[:], b[:32])
+    // 输出在交易的序号
+    txIn.Input.OutIdxInTx = binary.LittleEndian.Uint32(b[32:36])
+    offs = 32 + 4
+
+    l, n = LoadVarLen(b[offs:])
+    offs += n
+
+    // 加密脚本
+    txIn.ScriptSig = make([]byte, l)
+    copy(txIn.ScriptSig[:], b[offs:offs+l])
+    offs += l
+
+    // Sequence
+	txIn.Sequence = binary.LittleEndian.Uint32(b[offs:offs+4])
+	offs += 4
+
+	return
+}
+
+// 解码交易
+func DeserializeTx(b []byte) (tx *Tx, offs int) {
+	var l, n int
+
+	tx = new(Tx)
+	tx.Version = binary.LittleEndian.Uint32(b[0:4])
+	offs = 4
+
+	// TxIns
+	l, n = LoadVarLen(b[offs:])
+	offs += n
+	tx.TxIns = make([]*TxIn, l)
+	for i, _ := range tx.TxIns {
+		tx.TxIns[i], n = DeserializeTxIn(b[offs:])
+		offs += n
+	}
+
+	// TxOuts
+	l, n = LoadVarLen(b[offs:])
+	offs += n
+	tx.TxOuts = make([]*TxOut, l)
+	for i, _ := range tx.TxOuts {
+		tx.TxOuts[i], n =  DeserializeTxOut(b[offs:])
+		offs += n
+	}
+
+	tx.LockTime = binary.LittleEndian.Uint32(b[offs: offs+4])
+	offs += 4
+	return
 }
