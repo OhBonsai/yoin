@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"crypto/sha256"
+	"fmt"
 )
 
 // 签名hash类型
@@ -177,9 +178,66 @@ func (t *Tx) SignatureHash(scriptCode []byte, nIn int, hashType byte) ([]byte) {
 		binary.LittleEndian.PutUint32(tmpBuf[:4], t.TxIns[nIn].Sequence)
 	} else {
 		sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxIns))])
+
 		for i := range t.TxIns {
 			sha.Write(t.TxIns[i].Input.PreOutTxHash[:])
+			binary.LittleEndian.PutUint32(tmpBuf[:4], t.TxIns[i].Input.OutIdxInTx)
+			sha.Write(tmpBuf[:4])
 
+			if i == nIn {
+				sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(scriptCode))])
+				sha.Write(scriptCode[:])
+			} else {
+				sha.Write([]byte{0})
+			}
+
+			if (ht==SIGHASH_NONE || ht==SIGHASH_SINGLE) && i!=nIn {
+				sha.Write([]byte{0, 0, 0, 0})
+			} else {
+				binary.LittleEndian.PutUint32(tmpBuf[:4], t.TxIns[i].Sequence)
+				sha.Write(tmpBuf[:4])
+			}
 		}
 	}
+
+	if ht == SIGHASH_NONE {
+		sha.Write([]byte{0})
+	} else if ht == SIGHASH_SINGLE {
+		nOut := nIn
+
+		if nOut >= len(t.TxOuts) {
+			fmt.Printf("ERROR: SignatureHash() : nOut=%d out of range\n", nOut);
+			return nil
+		}
+
+		sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], nOut+1)])
+		for i:=0; i<nOut; i++ {
+			sha.Write([]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0})
+		}
+
+		binary.LittleEndian.PutUint64(tmpBuf[:8], t.TxOuts[nOut].Value)
+		sha.Write(tmpBuf[:8])
+		sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxOuts))])
+		sha.Write(t.TxOuts[nOut].ScriptPubKey[:])
+	} else {
+		sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxOuts))])
+
+		for i := range t.TxOuts {
+			binary.LittleEndian.PutUint64(tmpBuf[:8], t.TxOuts[i].Value)
+			sha.Write(tmpBuf[:8])
+
+			sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxOuts[i].ScriptPubKey))])
+			sha.Write(t.TxOuts[i].ScriptPubKey[:])
+		}
+	}
+
+	binary.LittleEndian.PutUint32(tmpBuf[:4], t.LockTime)
+	sha.Write(tmpBuf[:4])
+	sha.Write([]byte{hashType, 0, 0, 0})
+
+	// TODO 搞不懂，需要打印二进制来看看
+	tmp := sha.Sum(nil)
+	sha.Reset()
+	sha.Write(tmp)
+	return sha.Sum(nil)
 }

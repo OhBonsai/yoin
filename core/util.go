@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // 变长二进制小端存到指定buffer中
 // 这个算法可以更加极限一点，在NDS导航通讯协议中有更优秀的VARINT压缩逻辑
 func StoreVarLen(b []byte, value int)  int {
@@ -50,4 +52,22 @@ func LoadVarLen(b []byte) (len int, var_int_size int) {
 
 	len = int(res)
 	return len, var_int_size
+}
+
+
+// debug tool
+func PrintByteSlice(b []byte) {
+	for i, _ := range b{
+		if i % 16 == 0 {
+			fmt.Print("\n")
+			fmt.Printf("%d ", i / 16)
+		}
+
+		v := fmt.Sprintf("%x", b[i])
+		if len(v) == 1{
+			v = "0"+v
+		}
+		
+		fmt.Printf("%s ", v)
+	}
 }
