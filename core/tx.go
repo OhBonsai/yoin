@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"encoding/binary"
+	"crypto/sha256"
 )
 
 // 签名hash类型
@@ -149,4 +150,36 @@ func DeserializeTx(b []byte) (tx *Tx, offs int) {
 	tx.LockTime = binary.LittleEndian.Uint32(b[offs: offs+4])
 	offs += 4
 	return
+}
+
+
+// 对脚本进行签名
+func (t *Tx) SignatureHash(scriptCode []byte, nIn int, hashType byte) ([]byte) {
+	var tmpBuf [9]byte
+
+	ht := hashType & 0x1f
+	sha := sha256.New()
+
+	binary.LittleEndian.PutUint32(tmpBuf[:4], t.Version)
+	sha.Write(tmpBuf[:4])
+
+	if (hashType & SIGHASH_ANYONECANPAY) != 0 {
+		sha.Write([]byte{1}) // 只有一个输入
+
+		// 构造一个输入的 待HASH字节
+		sha.Write(t.TxIns[nIn].Input.PreOutTxHash[:])
+		binary.LittleEndian.PutUint32(tmpBuf[:4], t.TxIns[nIn].Input.OutIdxInTx)
+
+		sha.Write(tmpBuf[:4])
+		sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxIns))])
+		sha.Write(scriptCode[:])
+
+		binary.LittleEndian.PutUint32(tmpBuf[:4], t.TxIns[nIn].Sequence)
+	} else {
+		sha.Write(tmpBuf[:StoreVarLen(tmpBuf[:], len(t.TxIns))])
+		for i := range t.TxIns {
+			sha.Write(t.TxIns[i].Input.PreOutTxHash[:])
+
+		}
+	}
 }
