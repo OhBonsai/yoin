@@ -241,3 +241,11 @@ func (t *Tx) SignatureHash(scriptCode []byte, nIn int, hashType byte) ([]byte) {
 	sha.Write(tmp)
 	return sha.Sum(nil)
 }
+
+func (t *TxPrevOut)String() (s string) {
+	for i := 0; i<32; i++ {
+		s+= fmt.Sprintf("%02x", t.PreOutTxHash[31-i])
+	}
+	s+= fmt.Sprintf("-%03d", t.OutIdxInTx)
+	return
+}

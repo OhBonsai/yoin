@@ -10,3 +10,5 @@ Complete Bitcoin Wallet And Client Implement by Golang
   - tx.go 交易相关
   - uin256.go hash32byte一些辅助函数
   - util.go 一些功能函数
+  - chain.go 链相关
+  - dbif.go database interface
