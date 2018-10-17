@@ -39,4 +39,4 @@ type UnspentDB interface {
 	GetStats()(string)
 }
 
-var NewUnspentDb func(string bool) UnspentDB
+var NewUnspentDb func(string, bool) UnspentDB
