@@ -17,7 +17,6 @@ func (su *SingleUnspentTx) String() string {
 }
 
 
-
 type BlockChangeEvent struct {
 	Height     uint32
 	AddedTxs   map[TxPrevOut] *TxOut
@@ -40,3 +39,4 @@ type UnspentDB interface {
 	GetStats()(string)
 }
 
+var NewUnspentDb func(string bool) UnspentDB
