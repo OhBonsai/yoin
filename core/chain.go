@@ -42,10 +42,18 @@ func NewChain(dbRootDir string, genesis *Uint256, rescan bool) (ch *Chain) {
 
 }
 
+func NewBlockIndex(h []byte) (o [Uint256IdxLen]byte) {
+	copy(o[:], h[:Uint256IdxLen])
+	return
+}
+
+
 
 func (ch *Chain) loadBlockIndex() {
 	ch.BlockIndex = make(map[[Uint256IdxLen]byte]*BlockTreeNode, BlockMapInitLen)
 	ch.BlockTreeRoot = new(BlockTreeNode)
 	ch.BlockTreeRoot.BlockHash = ch.Genesis
-	ch.BlockTreeRoot.Bits = n
+	ch.BlockTreeRoot.Bits = nProofOfWorkLimit
+	ch.BlockIndex[NewBlockIndex(ch.Genesis.Hash[:])] = ch.BlockTreeRoot
+
 }
