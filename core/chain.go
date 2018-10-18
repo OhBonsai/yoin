@@ -2,17 +2,6 @@ package core
 
 import "sync"
 
-type BlockTreeNode struct {
-	BlockHash *Uint256
-	Height uint32
-	Bits uint32
-	Timestamp uint32
-	ParentHash *Uint256
-	Parent *BlockTreeNode
-	Children []*BlockTreeNode
-}
-
-
 
 type Chain struct {
 	Blocks *BlockDB
@@ -39,7 +28,14 @@ func NewChain(dbRootDir string, genesis *Uint256, rescan bool) (ch *Chain) {
 
 	ch.loadBlockIndex()
 
-
+	if rescan {
+		ch.BlockTreeEnd = ch.BlockTreeRoot
+	} else {
+		for i:=0; i<3 && ch.BlockTreeEnd.Height>0; i++ {
+			ch.UnSpent.UndoBlockTransactions(ch.BlockTreeEnd.Height)
+			ch.BlockTreeEnd = ch.BlockTreeEnd.Parent
+		}
+	}
 }
 
 func NewBlockIndex(h []byte) (o [Uint256IdxLen]byte) {

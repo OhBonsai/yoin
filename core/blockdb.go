@@ -53,12 +53,12 @@ type BlockDB struct {
 
 
 //  创建一个blockDB对象，并且初始化
-func newBlockDB(dirName string) (db *BlockDB) {
+func NewBlockDB(dirName string) (db *BlockDB) {
 	db = new(BlockDB)
 	db.dirName = dirName
 	db.blockIdxMap = make(map[[Uint256IdxLen]byte] *oneBlockIdx)
-	error := os.MkdirAll(db.dirName, 0770)
-	if error != nil {
+	err := os.MkdirAll(db.dirName, 0770)
+	if err != nil {
 		panic("wrong dir")
 	}
 
