@@ -24,8 +24,7 @@ func NewChain(dbRootDir string, genesis *Uint256, rescan bool) (ch *Chain) {
 	ch = new(Chain)
 	ch.Genesis = genesis
 	ch.Blocks = NewBlockDB(dbRootDir)
-	ch.UnSpent = NewUnspentDb(dbRootDir, rescan)
-
+	ch.UnSpent = NewUnspentDB(dbRootDir, rescan)
 	ch.loadBlockIndex()
 
 	if rescan {
@@ -36,6 +35,13 @@ func NewChain(dbRootDir string, genesis *Uint256, rescan bool) (ch *Chain) {
 			ch.BlockTreeEnd = ch.BlockTreeEnd.Parent
 		}
 	}
+
+	end, _ := ch.BlockTreeRoot.FindFarthestNode()
+	if end.Height > ch.BlockTreeEnd.Height {
+		ch.ParseTillBlock(end)
+	}
+
+	return
 }
 
 func NewBlockIndex(h []byte) (o [Uint256IdxLen]byte) {
