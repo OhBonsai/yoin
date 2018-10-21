@@ -11,8 +11,8 @@ Complete Bitcoin Wallet And Client Implement by Golang
   - blockdb.go 区块数据库
   - chain.go 链相关
   - chain_node.go 链结构节点相关
+  - dbif.go 数据库接口
   - tx.go 交易相关
   - uin256.go hash32byte一些辅助函数
   - util.go 一些功能函数
-  - dbif.go 数据库接口
-  －
+
