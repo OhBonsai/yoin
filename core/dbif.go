@@ -23,7 +23,7 @@ type BlockChangeEvent struct {
 	DeletedTxs map[TxPrevOut] *TxOut
 }
 
-type UnspentDB interface {
+type UnspentDBInf interface {
 	CommitBlockTxs(*BlockChangeEvent, []byte) error
 	UndoBlockTransactions(uint32)
 	GetLastBlockHash() []byte
@@ -39,4 +39,4 @@ type UnspentDB interface {
 	GetStats()(string)
 }
 
-var NewUnspentDB func(string, bool) UnspentDB
+var NewUnspentDB func(string, bool) UnspentDBInf
