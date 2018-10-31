@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"crypto/sha256"
 	"fmt"
+	"errors"
 )
 
 // 签名hash类型
@@ -15,6 +16,8 @@ const (
 	SIGHASH_SINGLE                 // 对某个输入输出负责
 	SIGHASH_ANYONECANPAY = 0x80
 )
+
+var slowMode bool
 
 type TxPrevOut struct {            // 输入引用那个未花费的输出
 	PreOutTxHash  [32]byte           // 对应输出的交易hash
@@ -247,5 +250,60 @@ func (t *TxPrevOut)String() (s string) {
 		s+= fmt.Sprintf("%02x", t.PreOutTxHash[31-i])
 	}
 	s+= fmt.Sprintf("-%03d", t.OutIdxInTx)
+	return
+}
+
+
+// 检查一下交易有么有问题
+func (tx *Tx) CheckTransaction() error {
+	// 得有点东西
+	if len(tx.TxIns)==0 {
+		return errors.New("CheckTransaction() : vin empty")
+	}
+	if len(tx.TxOuts)==0 {
+		return errors.New("CheckTransaction() : vout empty")
+	}
+
+	// 不能太大了
+	if tx.Size > MAX_BLOCK_SIZE {
+		return errors.New("CheckTransaction() : size limits failed")
+	}
+
+	if slowMode {
+		var nValueOut uint64
+		// 你钱转的太多了。。。不可能存在
+		for i := range tx.TxOuts {
+			if tx.TxOuts[i].Value > MAX_MONEY {
+				return errors.New("CheckTransaction() : txout.nValue too high")
+			}
+			nValueOut += tx.TxOuts[i].Value
+			if nValueOut > MAX_MONEY {
+				return errors.New("CheckTransaction() : txout total out of range")
+			}
+		}
+
+		// 是不是有重复得输入
+		vInOutPoints := make(map[TxPrevOut]bool, len(tx.TxIns))
+		for i := range tx.TxIns {
+			_, present := vInOutPoints[tx.TxIns[i].Input]
+			if present {
+				return errors.New("CheckTransaction() : duplicate inputs")
+			}
+			vInOutPoints[tx.TxIns[i].Input] = true
+		}
+	}
+
+
+
+}
+
+
+//是不是奖励比
+func (tx *Tx) isCoinBase() bool {
+	return len(tx.TxIns) == 1 && tx.TxIns[0].Input
+}
+
+//TXOUT是不是空，用来判断是不是厨师交易
+func (out TxPrevOut) IsNull() bool {
 	return
 }

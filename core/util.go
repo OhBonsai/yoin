@@ -6,6 +6,39 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
+// 用来判断交易输出是不是空
+func allzeros(b []byte) bool {
+	for i := range b {
+		if b[i]!=0 {
+			return false
+		}
+	}
+	return true
+}
+
+// 获取交易得梅克尔根值
+func getMerkel(txs []*Tx) ([]byte) {
+	mtr := make([][]byte, len(txs))
+	for i := range txs {
+		mtr[i] = txs[i].Hash.Hash[:]
+	}
+	var j, i2 int
+	for siz:=len(txs); siz>1; siz=(siz+1)/2 {
+		for i := 0; i < siz; i += 2 {
+			if i+1 < siz-1 {
+				i2 = i+1
+			} else {
+				i2 = siz-1
+			}
+			h := Sha2Sum(append(mtr[j+i], mtr[j+i2]...))
+			mtr = append(mtr, h[:])
+		}
+		j += siz
+	}
+	return mtr[len(mtr)-1]
+}
+
+
 // 变长二进制小端存到指定buffer中
 // 这个算法可以更加极限一点，在NDS导航通讯协议中有更优秀的VARINT压缩逻辑
 func StoreVarLen(b []byte, value int)  int {

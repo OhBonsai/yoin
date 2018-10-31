@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"time"
+	"bytes"
 )
 
 func (ch *Chain) CheckBlock(b *Block) (
@@ -41,12 +42,61 @@ func (ch *Chain) CheckBlock(b *Block) (
 	prevBlock, ok := ch.BlockIndex[NewUint256(b.PreBlockHash).BIdx()]
 	if !ok {
 		// 找不到你爹
-		e = errors.New("CheckBlock: "+bl.Hash.String()+" parent not found")
+		e = errors.New("CheckBlock: "+b.Hash.String()+" parent not found")
 		maylater = true
 		return
 	}
 
 	// 工作量证明检验
-	gnwr := GetNwe
+	gnwr := GetNextWorkRequired(prevBlock, b.CreateTime)
+	if b.DifficultyTarget != gnwr {
+		println("AcceptBlock() : incorrect proof of work ", b.DifficultyTarget," at block", prevBlock.Height+1,
+			" exp:", gnwr)
+		if !testnet || ((prevBlock.Height+1)%2016)!=0 {
+			e = errors.New("CheckBlock: incorrect proof of work")
+			dos = true
+			return
+		}
+	}
 
+	// 把交易都反序列化出来
+	e = b.DecodeTxListFromRaw()
+	if e != nil {
+		dos = true
+		return
+	}
+
+	if !b.Trusted {
+		// 首先你得有个奖励
+		if len(b.Txs) == 0 || !b.Txs[0].isCoinBase() {
+			e = errors.New("CheckBlock() : first tx is not coinbase: "+bl.Hash.String())
+			dos = true
+			return
+		}
+		// 其次你只能有一个Coinbase
+		for i:=1; i<len(b.Txs); i++ {
+			if b.Txs[i].isCoinBase() {
+				e = errors.New("CheckBlock() : more than one coinbase")
+				dos = true
+				return
+			}
+		}
+
+		// 检查梅克尔根
+		if !bytes.Equal(getMerkel(b.Txs), b.MerkleRoot) {
+			e = errors.New("CheckBlock() : Merkle Root mismatch")
+			dos = true
+			return
+		}
+
+		// 每个交易都检查一下
+		for i:=0; i<len(b.Txs); i++ {
+			e = b.Txs[i].CheckTransaction()
+			if e!=nil {
+				e = errors.New("CheckBlock() : CheckTransaction failed\n"+er.Error())
+				dos = true
+				return
+			}
+		}
+	}
 }

@@ -4,6 +4,9 @@ import "runtime"
 
 
 const (
+	MAX_BLOCK_SIZE = 1000000
+	COIN = 1e8
+	MAX_MONEY = 21000000 * COIN
 	BlockMapInitLen = 300e3
 )
 
