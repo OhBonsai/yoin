@@ -69,7 +69,7 @@ func (ch *Chain) CheckBlock(b *Block) (
 	if !b.Trusted {
 		// 首先你得有个奖励
 		if len(b.Txs) == 0 || !b.Txs[0].isCoinBase() {
-			e = errors.New("CheckBlock() : first tx is not coinbase: "+bl.Hash.String())
+			e = errors.New("CheckBlock() : first tx is not coinbase: "+b.Hash.String())
 			dos = true
 			return
 		}
@@ -93,10 +93,12 @@ func (ch *Chain) CheckBlock(b *Block) (
 		for i:=0; i<len(b.Txs); i++ {
 			e = b.Txs[i].CheckTransaction()
 			if e!=nil {
-				e = errors.New("CheckBlock() : CheckTransaction failed\n"+er.Error())
+				e = errors.New("CheckBlock() : CheckTransaction failed\n"+e.Error())
 				dos = true
 				return
 			}
 		}
 	}
+
+	return
 }
