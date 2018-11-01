@@ -1,5 +1,9 @@
 package core
 
+import (
+	"time"
+	"fmt"
+)
 
 type BlockTreeNode struct {
 	BlockHash *Uint256
@@ -9,6 +13,71 @@ type BlockTreeNode struct {
 	ParentHash *Uint256
 	Parent *BlockTreeNode
 	Children []*BlockTreeNode  //链可以分岔的
+}
+
+
+// 解析到某个区块
+func (ch *Chain) ParseTillBlock(end *BlockTreeNode) {
+	var b []byte
+	var er error
+	var trusted bool
+
+	prvSync := ch.DoNotSync
+	ch.DoNotSync = true
+
+	if end.Height - ch.BlockTreeEnd.Height > 100 {
+		ch.Unspent.NoSync()  // 非常安全了
+	}
+
+	prv := time.Now().UnixNano()
+	for ch.BlockTreeEnd != end {
+		cur := time.Now().UnixNano()
+		if cur-prv >= 10e9 {
+			fmt.Println("ParseTillBlock ...", ch.BlockTreeEnd.Height, "/", end.Height)
+			prv = cur
+		}
+		nxt := ch.BlockTreeEnd.FindNextNodePathTo(end)
+		if nxt == nil {
+			break
+		}
+
+		b, trusted, er = ch.Blocks.GetBlock(nxt.BlockHash)
+		if er != nil {
+			panic("Db.BlockGet(): "+er.Error())
+		}
+
+		bl, er := DeserializeBlock(b)
+		if er != nil {
+			ch.DeleteBranch(nxt)
+			break
+		}
+
+		bl.Trusted = trusted
+
+		bl.DecodeTxListFromRaw()
+
+		changes, er := ch.ProcessBlockTransactions(bl, nxt.Height)
+		if er != nil {
+			println("ProcessBlockTransactions", nxt.Height, er.Error())
+			ch.DeleteBranch(nxt)
+			break
+		}
+		ch.Blocks.TrustBlock(bl.Hash.Hash[:])
+		if !ch.DoNotSync {
+			ch.Blocks.Sync()
+		}
+		ch.Unspent.CommitBlockTxs(changes, bl.Hash.Hash[:])
+
+		ch.BlockTreeEnd = nxt
+	}
+	ch.Unspent.Sync()
+
+	if ch.BlockTreeEnd != end {
+		end, _ = ch.BlockTreeRoot.FindFarthestNode()
+		fmt.Println("ParseTillBlock failed - now go to", end.Height)
+		ch.MoveToBlock(end)
+	}
+	ch.DoNotSync = prvSync
 }
 
 
@@ -59,6 +128,49 @@ func (n *BlockTreeNode) FindNextNodePathTo(to *BlockTreeNode) (*BlockTreeNode) {
 	}
 
 	return nil
+}
+
+//
+func (ch *Chain)MoveToBlock(dst *BlockTreeNode) {
+	fmt.Printf("MoveToBlock: %d -> %\n", ch.BlockTreeEnd.Height, dst.Height)
+
+	cur := dst
+	for cur.Height > ch.BlockTreeEnd.Height {
+		cur = cur.Parent
+	}
+
+	// At this point both "ch.BlockTreeEnd" and "cur" should be at the same height
+	for ch.BlockTreeEnd != cur {
+		if don(DBG_ORPHAS) {
+			fmt.Printf("->orph block %s @ %d\n", ch.BlockTreeEnd.BlockHash.String(),
+				ch.BlockTreeEnd.Height)
+		}
+		ch.Unspent.UndoBlockTransactions(ch.BlockTreeEnd.Height)
+		ch.BlockTreeEnd = ch.BlockTreeEnd.Parent
+		cur = cur.Parent
+	}
+	fmt.Printf("Reached common node @ %d\n", ch.BlockTreeEnd.Height)
+	ch.ParseTillBlock(dst)
+}
+
+
+func (cur *BlockTreeNode) delAllChildren() {
+	for i := range cur.Children {
+		cur.Children[i].delAllChildren()
+	}
+}
+
+func (ch *Chain) DeleteBranch(cur *BlockTreeNode) {
+	// first disconnect it from the Parent
+	ch.BlockIndexAccess.Lock()
+	delete(ch.BlockIndex, cur.BlockHash.BIdx())
+	cur.Parent.delChild(cur)
+	cur.delAllChildren()
+	ch.BlockIndexAccess.Unlock()
+	ch.Blocks.InvalidBlock(cur.BlockHash.Hash[:])
+	if !ch.DoNotSync {
+		ch.Blocks.Sync()
+	}
 }
 
 
