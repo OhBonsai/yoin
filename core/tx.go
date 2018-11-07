@@ -293,17 +293,31 @@ func (tx *Tx) CheckTransaction() error {
 		}
 	}
 
+	if tx.isCoinBase() {
+		// coinbase没有数学题
+		if len(tx.TxIns[0].ScriptSig) < 2 || len(tx.TxIns[0].ScriptSig) > 100 {
+			return errors.New(fmt.Sprintf("CheckTransaction() : coinbase script size %d",
+				len(tx.TxIns[0].ScriptSig)))
+		}
+	}else {
+		for i:= range tx.TxIns {
+			// 不事coinbase，就不能为空
+			if tx.TxIns[i].Input.IsNull() {
+				return errors.New("CheckTransaction() : prevout is null")
+			}
+		}
+	}
 
-
+	return nil
 }
 
 
 //是不是奖励比
 func (tx *Tx) isCoinBase() bool {
-	return len(tx.TxIns) == 1 && tx.TxIns[0].Input
+	return len(tx.TxIns) == 1 && tx.TxIns[0].Input.IsNull()
 }
 
 //TXOUT是不是空，用来判断是不是厨师交易
-func (out TxPrevOut) IsNull() bool {
-	return
+func (in TxPrevOut) IsNull() bool {
+	return allzeros(in.PreOutTxHash[:]) && in.OutIdxInTx==0xffffffff
 }
