@@ -321,3 +321,13 @@ func (tx *Tx) isCoinBase() bool {
 func (in TxPrevOut) IsNull() bool {
 	return allzeros(in.PreOutTxHash[:]) && in.OutIdxInTx==0xffffffff
 }
+
+func (txin *TxIn) GetKeyAndSig() (sig *Signature, key *PublicKey, e error) {
+	sig, e = NewSignature(txin.ScriptSig[1:1+txin.ScriptSig[0]])
+	if e != nil {
+		return
+	}
+	offs := 1+txin.ScriptSig[0]
+	key, e = NewPublicKey(txin.ScriptSig[1+offs:1+offs+txin.ScriptSig[offs]])
+	return
+}

@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 )
 
-func (ch *Chain) ProcessBlockTransaction(bl *Block, height uint32) (changes *BlockChangeEvent, e error) {
+func (ch *Chain) ProcessBlockTransactions(bl *Block, height uint32) (changes *BlockChangeEvent, e error) {
 	changes = new(BlockChangeEvent)
 	changes.Height = height
 	changes.DeletedTxs = make(map[TxPrevOut]*TxOut)
@@ -49,7 +49,7 @@ func (ch *Chain) AcceptBlock(bl *Block) (e error) {
 		}
 
 		var changes *BlockChangeEvent
-		changes, e = ch.ProcessBlockTransaction(bl, cur.Height)
+		changes, e = ch.ProcessBlockTransactions(bl, cur.Height)
 		if e != nil {
 			println("ProcessBlockTransactions", cur.BlockHash.String(), cur.Height, e.Error())
 			ch.BlockIndexAccess.Lock()
