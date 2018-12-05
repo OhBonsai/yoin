@@ -23,6 +23,7 @@ func NewUint256(h []byte) (res *Uint256) {
 func NewSha2Hash(data []byte) (res *Uint256) {
 	res = new(Uint256)
 	res.Hash = Sha2Sum(data[:])
+	return
 }
 
 
@@ -44,4 +45,14 @@ func (u *Uint256) BigInt() *big.Int {
 		buf[i] = u.Hash[31-i]
 	}
 	return new(big.Int).SetBytes(buf[:])
+}
+
+func NewUint256FromString(s string) (res *Uint256) {
+	var v int
+	res = new(Uint256)
+	for i := 0; i<32; i++ {
+		fmt.Sscanf(s[2*i:2*i+2], "%x", &v)
+		res.Hash[31-i] = byte(v)
+	}
+	return
 }

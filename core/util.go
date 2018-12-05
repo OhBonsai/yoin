@@ -2,8 +2,6 @@ package core
 
 import (
 	"fmt"
-	"crypto/sha256"
-	"golang.org/x/crypto/ripemd160"
 )
 
 // 用来判断交易输出是不是空
