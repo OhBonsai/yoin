@@ -55,7 +55,12 @@ func setDownloadMax(par string) {
 func bwStats(par string) {
 	bwMutex.Lock()
 	defer bwMutex.Unlock()
-
+	tickRecv()
+	tickSent()
+	fmt.Printf("Downloading at %d/%d KB/s, %d KB total\n",
+		dlBytesPrvSec>>10, DownloadLimit>>10, dlBytesTotal>>10)
+	fmt.Printf("Uploading at %d/%d KB/s, %d KB total\n",
+		ulBytesPrvSec>>10, UploadLimit>>10, ulBytesTotal>>10)
 
 }
 
