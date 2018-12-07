@@ -64,6 +64,10 @@ func bwStats(par string) {
 
 }
 
+func init(){
+	newUi()
+}
+
 func tickRecv() {
 	now := time.Now().Unix()
 	if now != dlLastSec {
