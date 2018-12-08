@@ -1,28 +1,26 @@
 package client
 
 import (
-	"strings"
 	"bufio"
-	"os"
 	"fmt"
+	"os"
+	"strings"
+	"time"
 )
 
 type oneUiCmd struct {
-	cmds []string
-	help string
-	sync bool
+	cmds    []string
+	help    string
+	sync    bool
 	handler func(pars string)
 }
-
 
 type oneUiReq struct {
-	param string
+	param   string
 	handler func(pars string)
 }
 
-
 var uiCmds []*oneUiCmd
-
 
 func newUi(cmds string, sync bool, hn func(string), help string) {
 	cs := strings.Split(cmds, " ")
@@ -46,15 +44,25 @@ func readline() string {
 	return string(li)
 }
 
-func ask_yes_no(msg string) bool {
+func askYesNo(msg string) bool {
 	for {
 		fmt.Print(msg, " (y/n) : ")
 		l := strings.ToLower(readline())
-		if l=="y" {
+		if l == "y" {
 			return true
-		} else if l=="n" {
+		} else if l == "n" {
 			return false
 		}
 	}
 	return false
+}
+
+func doUserIf() {
+	var prompt bool = true
+	time.Sleep(5e8)
+	for {
+		if prompt {
+			fmt.Print(">")
+		}
+	}
 }
