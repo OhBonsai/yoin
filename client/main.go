@@ -39,6 +39,21 @@ var (
 	mutex sync.Mutex
 	uicmddone chan bool = make(chan bool, 1)
 	netBlocks chan *blockRcvd = make(chan *blockRcvd, 300)
+	uiChannel chan oneUiReq = make(chan oneUiReq, 1)
+
+	pendingBlocks map[[btc.Uint256IdxLen]byte] *btc.Uint256 = make(map[[btc.Uint256IdxLen]byte] *btc.Uint256, 600)
+	pendingFifo chan [btc.Uint256IdxLen]byte = make(chan [btc.Uint256IdxLen]byte, PendingFifoLen)
+
+	cachedBlocks map[[btc.Uint256IdxLen]byte] *btc.Block = make(map[[btc.Uint256IdxLen]byte] *btc.Block)
+	receivedBlocks map[[btc.Uint256IdxLen]byte] int64 = make(map[[btc.Uint256IdxLen]byte] int64, 300e3)
+
+	MyWallet *oneWallet
+
+	Counter map[string] uint64 = make(map[string]uint64)
+
+	busy string
+
+	TransactionsToSend map[[32]byte] []byte = make(map[[32]byte] []byte)
 
 )
 

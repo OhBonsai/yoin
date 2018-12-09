@@ -174,7 +174,7 @@ func (c *oneConnection) FetchMessage() (*BCmsg) {
 	c.TCPConn.SetReadDeadline(time.Now().Add(time.Microsecond))
 
 	for c.recv.hdr_len < 24 {
-
+		n, e = SockRead(c.TCPConn, c.recv.hdr[c.recv.hdr_len:24])
 	}
 }
 

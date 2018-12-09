@@ -65,8 +65,9 @@ func bwStats(par string) {
 }
 
 func init(){
-	newUi()
-}
+	newUi("bw", false, bwStats, "show network bandwidth statistics")
+	newUi("ulimit ul", false, setUploadMax, "Set maximum upload speed. The value is in KB/second - 0 for unlimited")
+	newUi("dlimit dl", false, setDownloadMax, "Set maximum download speed. The value is in KB/second - 0 for unlimited")}
 
 func tickRecv() {
 	now := time.Now().Unix()
@@ -77,6 +78,43 @@ func tickRecv() {
 	}
 }
 
+func countRcvd(n int) {
+	bwMutex.Lock()
+	tickRecv()
+	dlBytesSoFar += n
+	dlBytesTotal += uint64(n)
+	bwMutex.Unlock()
+}
+
+
+func SockRead(con *net.TCPConn, buf[]byte) (n int, err error) {
+	var toread int
+	bwMutex.Lock()
+	defer bwMutex.Unlock()
+
+	if DownloadLimit == 0 {
+		toread = len(buf)
+	} else {
+		toread = int(DownloadLimit) - dlBytesSoFar
+		if toread > len(buf) {
+			toread = len(buf)
+		} else if toread < 0 {
+			toread = 0
+		}
+	}
+
+	dlBytesSoFar += toread
+	dlBytesTotal += uint64(toread)
+	bwMutex.Unlock()
+
+	if toread > 0 {
+		n, err = con.Read(buf[:toread])
+	}
+	return
+
+}
+
+
 func tickSent() {
 	now := time.Now().Unix()
 	if now != ulLastSec {
@@ -86,10 +124,43 @@ func tickSent() {
 	}
 }
 
-
-func SockRead(con *net.TCPConn, buf[]byte) (n int, err error) {
-	var toread int
+func countSent(n int) {
 	bwMutex.Lock()
-	defer bwMutex.Unlock()
-
+	tickSent()
+	ulBytesSoFar += n
+	ulBytesTotal += uint64(n)
+	bwMutex.Unlock()
 }
+
+
+func SockWrite(con *net.TCPConn, buf []byte) (n int, e error) {
+	var tosend int
+	bwMutex.Lock()
+	tickSent()
+	if UploadLimit == 0 {
+		tosend = len(buf)
+	}else {
+		tosend = int(UploadLimit) - ulBytesSoFar
+		if tosend > len(buf) {
+			tosend = len(buf)
+		} else if tosend < 0 {
+			tosend = 0
+		}
+	}
+
+	ulBytesSoFar += tosend
+	ulBytesTotal += uint64(tosend)
+	bwMutex.Unlock()
+
+	if tosend > 0 {
+		con.SetWriteDeadline(time.Now().Add(10 * time.Millisecond))
+		n, e = con.Write(buf[:tosend])
+		if e != nil {
+			if nerr, ok := e.(net.Error); ok && nerr.Timeout() {
+				e = nil
+			}
+		}
+	}
+	return
+}
+
