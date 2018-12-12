@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -175,6 +177,182 @@ func (c *oneConnection) FetchMessage() (*BCmsg) {
 
 	for c.recv.hdr_len < 24 {
 		n, e = SockRead(c.TCPConn, c.recv.hdr[c.recv.hdr_len:24])
+		c.recv.hdr_len += n
+		if e != nil {
+			c.HandleError(e)
+			return nil
+		}
+
+		if c.recv.hdr_len >= 4 && !bytes.Equal(c.recv.hdr[:4], Magic[:]) {
+			println("FetchMessage: Proto out of sync")
+			c.Broken = true
+			return nil
+		}
+
+		if c.Broken {
+			return nil
+		}
+ 	}
+
+ 	dlen := binary.LittleEndian.Uint32(c.recv.hdr[16:20])
+
+ 	if dlen > 0 {
+ 		if c.recv.dat == nil {
+ 			c.recv.dat = make([]byte, dlen)
+ 			c.recv.datlen = 0
+		}
+		for c.recv.datlen < dlen {
+			n, e = SockRead(c.TCPConn, c.recv.dat[c.recv.datlen:])
+			c.recv.datlen += uint32(n)
+			if e != nil {
+				c.HandleError(e)
+				return nil
+			}
+			if c.Broken {
+				return nil
+			}
+		}
 	}
+
+	sh := core.Sha2Sum(c.recv.dat)
+	if !bytes.Equal(c.recv.hdr[20:24], sh[:4]) {
+		println(c.PeerAddr.Ip(), "Msg checksum error")
+		c.DoS()
+		c.recv.hdr_len = 0
+		c.recv.dat = nil
+		c.Broken = true
+		return nil
+	}
+
+	ret := new(BCmsg)
+	ret.cmd = strings.TrimRight(string(c.recv.hdr[4:16]), "\000")
+	ret.pl = c.recv.dat
+	c.recv.dat = nil
+	c.recv.hdr_len = 0
+
+	c.BytesReceived += uint64(24 + len(ret.pl))
+	return ret
 }
 
+func (c *oneConnection) AnnounceOwnAddr() {
+	if MyExternalAddr == nil {
+		return
+	}
+
+	var buf [31]byte
+	c.NextAddrSent = time.Now().Add(SendAddrsEvery)
+	buf[0] = 1
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(time.Now().Unix()))
+	ipd := MyExternalAddr.Bytes()
+	copy(buf[5:], ipd[:])
+
+	c.SendRawMsg("addr", buf[:])
+}
+
+
+func (c *oneConnection) VerMsg(pl []byte) error {
+	if len(pl) >= 46 {
+		c.node.version = binary.LittleEndian.Uint32(pl[0:4])
+		c.node.services = binary.LittleEndian.Uint64(pl[4:12])
+		c.node.timestamp = binary.LittleEndian.Uint64(pl[12:20])
+
+		if MyExternalAddr == nil {
+			MyExternalAddr = core.NewNetAddr(pl[20:46])
+			MyExternalAddr.Port = DefaultTcpPort
+		}
+
+		if len(pl) >= 86 {
+			le, of := core.LoadVarLen(pl[80:])
+			of += le
+			if len(pl) >= of + 4 {
+				c.node.height = binary.LittleEndian.Uint32(pl[of:of+4])
+			}
+		}
+	} else {
+		return errors.New("version message too short")
+	}
+	c.SendRawMsg("verack", []byte{})
+	if c.Incomming {
+		c.SendVersion()
+	}
+	return nil
+}
+
+
+func (c *oneConnection) GetBlocks(lastbl []byte) {
+	if dbg > 0 {
+		println("GetBlocks since", core.NewUint256(lastbl).String())
+	}
+
+	var b [4+1+32+32]byte
+	binary.LittleEndian.PutUint32(b[0:4], Version)
+	b[4] = 1
+	copy(b[5:37], lastbl)
+	c.SendRawMsg("getblocks", b[:])
+}
+
+
+func (c *oneConnection) ProcessInv(pl []byte) {
+	if len(pl) < 37 {
+		println(c.PeerAddr.Ip(), "inv payload too short", len(pl))
+		return
+	}
+
+	cnt, of := core.LoadVarLen(pl)
+
+	if len(pl) != of + 36*cnt {
+		println("inv payload length mismatch", len(pl), of, cnt)
+	}
+
+	var txs uint32
+	for i:=0; i<cnt; i++{
+		typ := binary.LittleEndian.Uint32(pl[of:of+4])
+		if typ == 2 {
+			InvsNotify(pl[of+4:of+36])
+		} else {
+			txs ++
+		}
+		of += 36
+	}
+
+	if dbg>1 {
+		println(c.PeerAddr.Ip(), "ProcessInv:", cnt, "tot /", txs, "txs")
+	}
+	return
+
+}
+
+
+func NetSendInv(typ uint32, h []byte, fromConn *oneConnection) (cnt uint) {
+	inv := new([36]byte)
+	binary.LittleEndian.PutUint32(inv[0:4], typ)
+	copy(inv[4:36], h)
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for _, v := range openCons {
+		if v != fromConn {
+			if len(v.PendingInvs) < 500 {
+				v.PendingInvs = append(v.PendingInvs, inv)
+				cnt ++
+			}
+		}
+	}
+	return
+}
+
+
+func addInvBlockBranch(inv map[[32]byte] bool, bl *core.BlockTreeNode, stop *core.Uint256) {
+	if len(inv)>=500 || bl.BlockHash.Equal(stop) {
+		return
+	}
+
+	inv[bl.BlockHash.Hash] = true
+	for i:= range bl.Children {
+		if len(inv) >= 500 {
+			return
+		}
+		addInvBlockBranch(inv, bl.Children[i], stop)
+	}
+}

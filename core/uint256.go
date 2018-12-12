@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"math/big"
+	"bytes"
 )
 
 const Uint256IdxLen = 6  // bigger number, larger memory needed , less collision happen
@@ -32,6 +33,10 @@ func (u *Uint256) String() (s string) {
 		s+= fmt.Sprintf("%02x", u.Hash[31-i])
 	}
 	return
+}
+
+func (u *Uint256) Equal(o *Uint256) bool {
+	return bytes.Equal(u.Hash[:], o.Hash[:])
 }
 
 func (u *Uint256) BIdx() [Uint256IdxLen]byte {
