@@ -61,3 +61,10 @@ var (
 type blockRcvd struct {
 	conn *o
 }
+
+
+func CountSafe(k string) {
+	mutex.Lock()
+	Counter[k]++
+	mutex.Unlock()
+}

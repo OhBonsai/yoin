@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"io"
+	"github.com/pkg/errors"
 )
 
 // 用来判断交易输出是不是空
@@ -88,6 +90,58 @@ func LoadVarLen(b []byte) (len int, var_int_size int) {
 	len = int(res)
 	return len, var_int_size
 }
+
+func ReadVarLen(b io.Reader) (res uint64, e error) {
+	var buf [8]byte;
+	var n int
+
+	n, e = b.Read(buf[:1])
+	if e != nil {
+		println("ReadVLen1 error:", e.Error())
+		return
+	}
+
+	if n != 1 {
+		e = errors.New("Buffer empty")
+		return
+	}
+
+	if buf[0] < 0xfd {
+		res = uint64(buf[0])
+		return
+	}
+
+	c := 2 << (2-(0xff-buf[0]));
+
+	n, e = b.Read(buf[:c])
+	if e != nil {
+		println("ReadVLen1 error:", e.Error())
+		return
+	}
+	if n != c {
+		e = errors.New("Buffer too short")
+		return
+	}
+	for i:=0; i<c; i++ {
+		res |= (uint64(buf[i]) << uint64(8*i))
+	}
+	return
+}
+
+
+// Writes var_length field into the given writer
+func WriteVarLen(b io.Writer, var_len uint32) {
+	if var_len < 0xfd {
+		b.Write([]byte{byte(var_len)})
+		return
+	}
+	if var_len < 0x10000 {
+		b.Write([]byte{0xfd, byte(var_len), byte(var_len>>8)})
+		return
+	}
+	b.Write([]byte{0xfe, byte(var_len), byte(var_len>>8), byte(var_len>>16), byte(var_len>>24)})
+}
+
 
 
 // debug tool

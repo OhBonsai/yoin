@@ -356,3 +356,76 @@ func addInvBlockBranch(inv map[[32]byte] bool, bl *core.BlockTreeNode, stop *cor
 		addInvBlockBranch(inv, bl.Children[i], stop)
 	}
 }
+
+func (c *oneConnection) ProcessGetBlocks(pl []byte) {
+	b := bytes.NewReader(pl)
+
+	var ver uint32
+	e := binary.Read(b, binary.LittleEndian, &ver)
+
+	if e != nil {
+		println("ProcessGetBlocks:", e.Error(), c.PeerAddr.Ip())
+		return
+	}
+
+	cnt, e := core.ReadVarLen(b)
+	if e != nil {
+		println("ProcessGetBlocks:", e.Error(), c.PeerAddr.Ip())
+	}
+
+	h2get := make([]*core.Uint256, cnt)
+	var h [32]byte
+	for i:=0; i<int(cnt); i++ {
+		n, _ := b.Read(h[:])
+		if n != 32 {
+			println("getblocks too short", c.PeerAddr.Ip())
+			return
+		}
+
+		h2get[i] = core.NewUint256(h[:])
+		if dbg > 1 {
+			println(c.PeerAddr.Ip(), "getbl", h2get[i].String())
+		}
+	}
+
+	n, _ := b.Read(h[:])
+	if n != 32 {
+		println("getblocks does not have hash_stop", c.PeerAddr.Ip())
+		return
+	}
+
+	hashstop := core.NewUint256(h[:])
+
+	var maxheight uint32
+	invs := make(map[[32]byte] bool, 500)
+	for i := range h2get {
+		BlockChain.BlockIndexAccess.Lock()
+		if bl, ok := BlockChain.BlockIndex[h2get[i].BIdx()]; ok {
+			if bl.Height > maxheight {
+				maxheight = bl.Height
+			}
+			addInvBlockBranch(invs, bl, hashstop)
+		}
+		BlockChain.BlockIndexAccess.Unlock()
+		if len(invs) >= 500 {
+			break
+		}
+	}
+
+	if len(invs) > 0 {
+		inv := new(bytes.Buffer)
+		core.WriteVarLen(inv, uint32(len(invs)))
+		for k, _ := range invs {
+			binary.Write(inv, binary.LittleEndian, uint32(2))
+			inv.Write(k[:])
+		}
+
+		if dbg > 1 {
+			fmt.Println(c.PeerAddr.Ip(), "getblocks", cnt, maxheight, " ...", len(invs), "invs in resp ->", len(inv.Bytes()))
+		}
+
+		CountSafe("GetblocksReplies")
+		c.SendRawMsg("inv", inv.Bytes())
+
+	}
+}
