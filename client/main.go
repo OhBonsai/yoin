@@ -3,7 +3,7 @@ package client
 import (
 	"flag"
 	"github.com/OhBonsai/yoin/core"
-	"github.com/piotrnar/gocoin/btc"
+	"github.com/piotrnar/gocoin/core"
 	"time"
 	"sync"
 )
@@ -26,7 +26,7 @@ var (
 
 	GenesisBlokc *core.Uint256
 	Magic [4]byte
-	BlockChain *btc.Chain
+	BlockChain *core.Chain
 	AddrVersion byte
 
 	exit_now bool
@@ -41,11 +41,11 @@ var (
 	netBlocks chan *blockRcvd = make(chan *blockRcvd, 300)
 	uiChannel chan oneUiReq = make(chan oneUiReq, 1)
 
-	pendingBlocks map[[btc.Uint256IdxLen]byte] *btc.Uint256 = make(map[[btc.Uint256IdxLen]byte] *btc.Uint256, 600)
-	pendingFifo chan [btc.Uint256IdxLen]byte = make(chan [btc.Uint256IdxLen]byte, PendingFifoLen)
+	pendingBlocks map[[core.Uint256IdxLen]byte] *core.Uint256 = make(map[[core.Uint256IdxLen]byte] *core.Uint256, 600)
+	pendingFifo chan [core.Uint256IdxLen]byte = make(chan [core.Uint256IdxLen]byte, PendingFifoLen)
 
-	cachedBlocks map[[btc.Uint256IdxLen]byte] *btc.Block = make(map[[btc.Uint256IdxLen]byte] *btc.Block)
-	receivedBlocks map[[btc.Uint256IdxLen]byte] int64 = make(map[[btc.Uint256IdxLen]byte] int64, 300e3)
+	cachedBlocks map[[core.Uint256IdxLen]byte] *core.Block = make(map[[core.Uint256IdxLen]byte] *core.Block)
+	receivedBlocks map[[core.Uint256IdxLen]byte] int64 = make(map[[core.Uint256IdxLen]byte] int64, 300e3)
 
 	MyWallet *oneWallet
 

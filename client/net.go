@@ -426,6 +426,5 @@ func (c *oneConnection) ProcessGetBlocks(pl []byte) {
 
 		CountSafe("GetblocksReplies")
 		c.SendRawMsg("inv", inv.Bytes())
-
 	}
 }
